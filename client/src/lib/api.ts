@@ -4,7 +4,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 const getBaseUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_URL;
   
-  if (envUrl && envUrl.trim() !== '') {
+  if (envUrl && envUrl.trim() !== '' && envUrl !== '/api') {
     const cleanUrl = envUrl.trim().replace(/\/+$/, '');
     return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
   }
@@ -14,8 +14,8 @@ const getBaseUrl = (): string => {
     return 'http://localhost:5000/api';
   }
   
-  // Fallback for production relative proxying
-  return '/api';
+  // Direct production fallback to live Render backend service
+  return 'https://mailtrace-ai-server.onrender.com/api';
 };
 
 export const api = axios.create({
