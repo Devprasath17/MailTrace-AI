@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { 
@@ -14,6 +14,7 @@ import {
   MessageSquare, 
   ChevronLeft,
   Printer,
+  Trash2,
   X
 } from 'lucide-react';
 import { InvestigationGraph } from '../components/InvestigationGraph';
@@ -57,6 +58,25 @@ export const InvestigationDetail: React.FC = () => {
       setUpdating(false);
     }
   });
+
+  const navigate = useNavigate();
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const res = await api.delete(`/investigations/${id}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investigations'] });
+      navigate('/investigations');
+    }
+  });
+
+  const handleDeleteCase = () => {
+    if (window.confirm('Are you sure you want to delete this investigation case and all associated reports? This action cannot be undone.')) {
+      deleteMutation.mutate();
+    }
+  };
 
   if (isLoading) {
     return <div className="flex h-64 items-center justify-center text-xs text-slate-400">Loading case file...</div>;
@@ -106,7 +126,7 @@ export const InvestigationDetail: React.FC = () => {
           <p className="mt-0.5 text-xs text-slate-300 font-medium">{invData.title}</p>
         </div>
 
-        {/* Status Quick Updater & Report Button */}
+        {/* Status Quick Updater, Report Button & Delete Button */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowReportModal(true)}
@@ -114,6 +134,15 @@ export const InvestigationDetail: React.FC = () => {
           >
             <Printer className="h-3.5 w-3.5 text-cyan-400" />
             <span>Forensic Report</span>
+          </button>
+
+          <button
+            onClick={handleDeleteCase}
+            disabled={deleteMutation.isPending}
+            className="flex items-center gap-1.5 rounded-lg border border-rose-900/60 bg-rose-950/40 px-3 py-1.5 text-xs font-bold text-rose-400 hover:bg-rose-900/40 hover:text-rose-300 disabled:opacity-50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            <span>{deleteMutation.isPending ? 'Deleting...' : 'Delete Case'}</span>
           </button>
 
           <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-[#0b101d] p-1.5">
@@ -295,6 +324,14 @@ export const InvestigationDetail: React.FC = () => {
                 >
                   <Printer className="h-4 w-4" />
                   <span>Print Report</span>
+                </button>
+                <button
+                  onClick={handleDeleteCase}
+                  disabled={deleteMutation.isPending}
+                  className="flex items-center gap-2 rounded-lg border border-rose-900/60 bg-rose-950/40 px-4 py-2 text-xs font-bold text-rose-400 hover:bg-rose-900/40"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Report</span>
                 </button>
                 <button
                   onClick={() => setShowReportModal(false)}

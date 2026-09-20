@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
-import { Briefcase, Search, Filter, Shield, ChevronRight } from 'lucide-react';
+import { Briefcase, Search, Filter, Shield, ChevronRight, Trash2 } from 'lucide-react';
 
 export const Investigations: React.FC = () => {
+  const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [severityFilter, setSeverityFilter] = useState('ALL');
   const [search, setSearch] = useState('');
@@ -19,6 +20,24 @@ export const Investigations: React.FC = () => {
     }
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await api.delete(`/investigations/${id}`);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investigations'] });
+    }
+  });
+
+  const handleDelete = (id: string, caseNumber: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (window.confirm(`Are you sure you want to delete investigation case ${caseNumber} and its reports?`)) {
+      deleteMutation.mutate(id);
+    }
+  };
+
   const list = data?.data || [];
 
   return (
@@ -30,7 +49,7 @@ export const Investigations: React.FC = () => {
             <Briefcase className="h-5 w-5 text-cyan-400" />
             <span>Investigation Cases</span>
           </h1>
-          <p className="mt-0.5 text-xs text-slate-400">Manage, inspect, and update active security incidents</p>
+          <p className="mt-0.5 text-xs text-slate-400">Manage, inspect, update, and delete active security incidents & forensic reports</p>
         </div>
 
         <Link
@@ -102,7 +121,7 @@ export const Investigations: React.FC = () => {
                 <th className="py-3 px-4">Severity</th>
                 <th className="py-3 px-4">Risk Score</th>
                 <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Action</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -126,11 +145,19 @@ export const Investigations: React.FC = () => {
                       {inv.status}
                     </span>
                   </td>
-                  <td className="py-3.5 px-4 text-right">
+                  <td className="py-3.5 px-4 text-right flex items-center justify-end gap-3">
                     <Link to={`/investigations/${inv.id}`} className="text-cyan-400 hover:underline font-semibold inline-flex items-center gap-1">
                       <span>Inspect</span>
                       <ChevronRight className="h-3 w-3" />
                     </Link>
+
+                    <button
+                      onClick={(e) => handleDelete(inv.id, inv.case_number, e)}
+                      title="Delete Investigation & Reports"
+                      className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded hover:bg-slate-800"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </td>
                 </tr>
               ))}

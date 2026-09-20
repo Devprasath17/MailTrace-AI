@@ -14,6 +14,7 @@ export interface MemoryInvestigation {
   email_analyses?: any[];
   indicators?: any[];
   evidence?: any[];
+  reports?: any[];
   investigation_notes?: any[];
   investigation_status_history?: any[];
 }
@@ -68,6 +69,15 @@ export class MemoryStoreService {
     }
 
     return inv;
+  }
+
+  public static deleteInvestigation(id: string): boolean {
+    const idx = this.investigations.findIndex(i => i.id === id || i.case_number === id);
+    if (idx !== -1) {
+      this.investigations.splice(idx, 1);
+      return true;
+    }
+    return false;
   }
 
   public static addIndicators(items: any[]) {

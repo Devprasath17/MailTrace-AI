@@ -14,7 +14,7 @@ router.post(
   '/analyze',
   authenticateUser,
   requireRoles(['SUPER_ADMIN', 'SECURITY_ADMIN', 'SOC_ANALYST', 'INCIDENT_RESPONDER']),
-  upload.single('emlFile'),
+  upload.any(),
   EmailController.analyzeEmail
 );
 

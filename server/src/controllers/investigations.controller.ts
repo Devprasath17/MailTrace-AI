@@ -78,6 +78,7 @@ export class InvestigationsController {
           email_analyses (*),
           indicators (*),
           evidence (*),
+          reports (*),
           investigation_notes (*),
           investigation_status_history (*)
         `)
@@ -252,6 +253,41 @@ export class InvestigationsController {
       return res.status(200).json({ nodes, edges });
     } catch (err: any) {
       return res.status(500).json({ error: 'Failed to generate investigation graph. ' + (err?.message || '') });
+    }
+  }
+
+  public static async deleteInvestigation(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const supabase = getSupabaseAdmin();
+      const orgId = req.user?.organizationId || '00000000-0000-0000-0000-000000000001';
+
+      if (supabase) {
+        const { error } = await supabase
+          .from('investigations')
+          .delete()
+          .eq('id', id)
+          .eq('organization_id', orgId);
+
+        if (error) {
+          console.error('Supabase delete investigation error:', error);
+        }
+
+        await supabase.from('audit_logs').insert({
+          organization_id: orgId,
+          user_id: req.user?.id,
+          action: 'INVESTIGATION_DELETED',
+          resource_type: 'INVESTIGATION',
+          resource_id: id,
+          metadata_json: { deletedAt: new Date().toISOString() }
+        });
+      }
+
+      MemoryStoreService.deleteInvestigation(id);
+
+      return res.status(200).json({ message: 'Investigation and associated forensic reports successfully deleted.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to delete investigation. ' + (err?.message || '') });
     }
   }
 }

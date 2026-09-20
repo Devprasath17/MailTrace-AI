@@ -24,6 +24,13 @@ router.patch(
   InvestigationsController.updateInvestigation
 );
 
+router.delete(
+  '/:id',
+  authenticateUser,
+  requireRoles(['SUPER_ADMIN', 'SECURITY_ADMIN', 'SOC_ANALYST', 'INCIDENT_RESPONDER']),
+  InvestigationsController.deleteInvestigation
+);
+
 router.get(
   '/:id/graph',
   authenticateUser,

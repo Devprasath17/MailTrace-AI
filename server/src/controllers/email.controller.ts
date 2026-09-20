@@ -9,11 +9,14 @@ export class EmailController {
   public static async analyzeEmail(req: AuthenticatedRequest, res: Response) {
     try {
       let rawEmailContent: Buffer | string = '';
+      const uploadedFile = req.file || (req.files && Array.isArray(req.files) && req.files.length > 0 ? (req.files as any[])[0] : null);
 
-      if (req.file) {
-        rawEmailContent = req.file.buffer;
-      } else if (req.body?.rawHeaders || req.body?.rawEmail) {
-        rawEmailContent = req.body.rawEmail || req.body.rawHeaders;
+      if (uploadedFile && uploadedFile.buffer) {
+        rawEmailContent = uploadedFile.buffer;
+      } else if (req.body?.rawHeaders || req.body?.rawEmail || req.body?.emlContent || req.body?.content) {
+        rawEmailContent = req.body.rawEmail || req.body.rawHeaders || req.body.emlContent || req.body.content;
+      } else if (typeof req.body === 'string' && req.body.trim().length > 0) {
+        rawEmailContent = req.body;
       } else {
         return res.status(400).json({ error: 'No email content provided. Please upload an .eml file or paste raw email headers.' });
       }
@@ -29,7 +32,7 @@ export class EmailController {
         organizationId: orgId,
         userId,
         rawEmailContent,
-        fileName: req.file?.originalname || 'submitted-email.eml'
+        fileName: uploadedFile?.originalname || 'submitted-email.eml'
       };
 
       // Run Multi-Agent Investigation Workflow
@@ -92,6 +95,14 @@ export class EmailController {
             ai_analysis_json: state.aiAssessment || {},
             risk_breakdown_json: riskAnalysis
           });
+
+          await supabase.from('reports').insert({
+            investigation_id: inv.id,
+            organization_id: orgId,
+            title: `Forensic Threat Report: ${parsedEmail.subject || caseId}`,
+            summary: state.aiAssessment?.explanation || `Forensic investigation report for case ${caseId}. Risk score: ${riskAnalysis.riskScore}/100. Threat classification: ${riskAnalysis.threatType}.`,
+            generated_by: userId
+          });
         }
       }
 
@@ -133,9 +144,16 @@ export class EmailController {
           })),
           evidence: [{
             id: 'ev-' + Date.now(),
-            file_name: req.file?.originalname || 'submitted-email.eml',
+            file_name: uploadedFile?.originalname || 'submitted-email.eml',
             file_size: typeof rawEmailContent === 'string' ? Buffer.byteLength(rawEmailContent) : rawEmailContent.length,
             sha256_hash: state.evidence?.sha256Hash || parsedEmail.sha256Hash,
+            created_at: new Date().toISOString()
+          }],
+          reports: [{
+            id: 'rep-' + Date.now(),
+            investigation_id: dbRecordId,
+            title: `Forensic Threat Report: ${parsedEmail.subject || caseId}`,
+            summary: state.aiAssessment?.explanation || `Forensic investigation report for case ${caseId}. Risk score: ${riskAnalysis.riskScore}/100. Threat classification: ${riskAnalysis.threatType}.`,
             created_at: new Date().toISOString()
           }],
           investigation_notes: [],
