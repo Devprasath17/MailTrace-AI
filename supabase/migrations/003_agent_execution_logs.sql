@@ -23,10 +23,12 @@ CREATE INDEX IF NOT EXISTS idx_agent_execution_logs_org ON public.agent_executio
 ALTER TABLE public.agent_execution_logs ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Users can view agent execution logs in their organization" ON public.agent_execution_logs;
 CREATE POLICY "Users can view agent execution logs in their organization"
     ON public.agent_execution_logs FOR SELECT
     USING (organization_id = public.get_current_user_org_id());
 
+DROP POLICY IF EXISTS "System and analysts can insert agent execution logs" ON public.agent_execution_logs;
 CREATE POLICY "System and analysts can insert agent execution logs"
     ON public.agent_execution_logs FOR INSERT
     WITH CHECK (organization_id = public.get_current_user_org_id());
