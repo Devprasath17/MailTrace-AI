@@ -66,7 +66,9 @@ export const AnalyzeEmail: React.FC = () => {
       setAnalysisResult(res.data);
     } catch (err: any) {
       console.error('Analysis error:', err);
-      setError(err.response?.data?.error || 'Failed to complete email analysis.');
+      const serverError = err.response?.data?.error;
+      const fallbackError = err.message ? `Request failed: ${err.message}` : 'Failed to complete email analysis.';
+      setError(serverError || fallbackError);
     } finally {
       setAnalyzing(false);
     }

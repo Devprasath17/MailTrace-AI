@@ -38,7 +38,8 @@ export class EmailController {
 
       const parsedEmail = state.forensics;
       if (!parsedEmail) {
-        return res.status(500).json({ error: 'Multi-agent email forensics analysis failed to extract headers.' });
+        const errorDetail = state.errors.map(e => e.message).join('; ') || 'Multi-agent email forensics analysis failed to extract headers.';
+        return res.status(400).json({ error: `Email analysis failed: ${errorDetail}` });
       }
 
       const riskAnalysis = state.riskAnalysis || {
