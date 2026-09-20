@@ -1,0 +1,22 @@
+From: "Urgent Payroll Notice" <hr-update@payroll-phish-domain.com>
+To: "SOC Analyst" <analyst@company.com>
+Subject: URGENT: Update Your Direct Deposit Credentials Immediately
+Date: Sun, 20 Sep 2026 12:00:00 +0000
+Message-ID: <msg-20260920-phish@payroll-phish-domain.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Received: from mail.payroll-phish-domain.com (198.51.100.45) by mx.company.com (10.0.0.1); Sun, 20 Sep 2026 12:00:01 +0000
+Authentication-Results: mx.company.com; spf=fail smtp.mailfrom=payroll-phish-domain.com; dkim=fail; dmarc=fail
+
+Dear Employee,
+
+Our accounting department detected an anomaly in your direct deposit record.
+Please verify your banking portal immediately to avoid salary suspension:
+
+http://login-verify-account.payroll-phish-domain.com/auth/login?user=analyst
+
+Originating IP: 198.51.100.45
+Domain: payroll-phish-domain.com
+
+Sincerely,
+HR Operations
