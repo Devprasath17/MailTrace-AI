@@ -61,9 +61,7 @@ export const AnalyzeEmail: React.FC = () => {
       setTimeout(() => setProgressStep('Running Google Gemini AI threat classification...'), 1800);
       setTimeout(() => setProgressStep('Computing SHA-256 evidence integrity hash...'), 2400);
 
-      const res = await api.post('/email/analyze', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await api.post('/email/analyze', formData);
 
       setAnalysisResult(res.data);
     } catch (err: any) {

@@ -28,9 +28,7 @@ export const UploadEvidenceModal: React.FC<Props> = ({ onClose }) => {
       setTimeout(() => setProgressState('HASHING'), 300);
       setTimeout(() => setProgressState('PRESERVING'), 700);
 
-      const res = await api.post('/evidence', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const res = await api.post('/evidence', formData);
       return res.data;
     },
     onSuccess: () => {
