@@ -37,22 +37,7 @@ export class GeminiService {
       };
     }
 
-    if (!key.startsWith('AIzaSy')) {
-      return {
-        status: 'UNCONFIGURED',
-        result: {
-          classification: 'UNKNOWN',
-          attackType: 'Invalid Gemini API Key Format',
-          confidence: 0,
-          riskFactors: [`Configured GEMINI_API_KEY does not appear to be a Google AI Studio key (starts with '${key.slice(0, 5)}...').`],
-          explanation: `Google Generative AI API keys from Google AI Studio always start with 'AIzaSy...'. Key '${key.slice(0, 10)}...' was rejected by Google endpoints.`,
-          recommendedActions: [
-            'Visit https://aistudio.google.com/app/apikey to generate a free Gemini API key.',
-            'Update GEMINI_API_KEY in server/.env with your AIzaSy... key.'
-          ]
-        }
-      };
-    }
+
 
     const prompt = `
 Act as an expert Cybersecurity Incident Response AI Analyst.
