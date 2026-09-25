@@ -9,6 +9,7 @@ export interface MemoryInvestigation {
   risk_score: number;
   created_by?: string;
   assigned_to?: string;
+  is_demo?: boolean;
   created_at: string;
   updated_at: string;
   email_analyses?: any[];
