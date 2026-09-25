@@ -30,7 +30,15 @@ export const AnalyzeEmail: React.FC = () => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      setFile(selectedFile);
+      if (import.meta.env.DEV) {
+        console.log('[AnalyzeEmail] Selected file metadata:', {
+          name: selectedFile.name,
+          type: selectedFile.type,
+          size: selectedFile.size
+        });
+      }
     }
   };
 
@@ -51,9 +59,11 @@ export const AnalyzeEmail: React.FC = () => {
     try {
       const formData = new FormData();
       if (activeTab === 'upload' && file) {
+        formData.append('file', file);
         formData.append('emlFile', file);
       } else {
         formData.append('rawHeaders', rawText);
+        formData.append('rawEmail', rawText);
       }
 
       setTimeout(() => setProgressStep('Checking SPF, DKIM, DMARC authentication...'), 600);

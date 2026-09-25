@@ -19,14 +19,19 @@ const getBaseUrl = (): string => {
 };
 
 export const api = axios.create({
-  baseURL: getBaseUrl(),
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  baseURL: getBaseUrl()
 });
 
-// Auto-attach Supabase Auth Token to Express API calls if Supabase is configured
+// Auto-attach Supabase Auth Token and handle FormData boundaries
 api.interceptors.request.use(async (config) => {
+  // If request data is FormData, remove Content-Type header to allow Axios/browser to set boundary automatically
+  if (config.data instanceof FormData) {
+    if (config.headers) {
+      delete config.headers['Content-Type'];
+      delete config.headers['content-type'];
+    }
+  }
+
   if (isSupabaseConfigured) {
     try {
       const { data } = await supabase.auth.getSession();

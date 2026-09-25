@@ -12,6 +12,13 @@ export class EmailController {
       const uploadedFile = req.file || (req.files && Array.isArray(req.files) && req.files.length > 0 ? (req.files as any[])[0] : null);
 
       if (uploadedFile && uploadedFile.buffer) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[EmailController] Received uploaded file:', {
+            originalname: uploadedFile.originalname,
+            mimetype: uploadedFile.mimetype,
+            size: uploadedFile.size
+          });
+        }
         rawEmailContent = uploadedFile.buffer;
       } else if (req.body?.rawHeaders || req.body?.rawEmail || req.body?.emlContent || req.body?.content) {
         rawEmailContent = req.body.rawEmail || req.body.rawHeaders || req.body.emlContent || req.body.content;
