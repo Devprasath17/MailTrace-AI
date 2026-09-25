@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "seed:demo": "npm --prefix server run seed:demo"
+  },
   "devDependencies": {
     "@playwright/test": "^1.63.0"
   }

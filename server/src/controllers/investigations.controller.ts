@@ -8,8 +8,9 @@ export class InvestigationsController {
     try {
       const supabase = getSupabaseAdmin();
       const orgId = req.user?.organizationId || '00000000-0000-0000-0000-000000000001';
+      const isDevMode = process.env.LOCAL_DEV_STORE === 'true' || !supabase;
 
-      if (!supabase) {
+      if (isDevMode) {
         let list = MemoryStoreService.getInvestigations(orgId);
         const { status, severity, search } = req.query;
 
@@ -60,10 +61,9 @@ export class InvestigationsController {
     try {
       const { id } = req.params;
       const supabase = getSupabaseAdmin();
-      const orgId = req.user?.organizationId || '00000000-0000-0000-0000-000000000001';
+      const isDevMode = process.env.LOCAL_DEV_STORE === 'true' || !supabase;
 
-
-      if (!supabase) {
+      if (isDevMode) {
         const memInv = MemoryStoreService.getInvestigationById(id);
         if (!memInv) {
           return res.status(404).json({ error: 'Investigation record not found.' });

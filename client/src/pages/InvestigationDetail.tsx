@@ -119,6 +119,11 @@ export const InvestigationDetail: React.FC = () => {
           </Link>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold font-mono text-cyan-400">{invData.case_number}</h1>
+            {invData.is_demo && (
+              <span className="rounded bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/30">
+                DEMO RECORD
+              </span>
+            )}
             <span className="rounded bg-cyan-500/10 px-2.5 py-0.5 text-xs font-bold text-cyan-400 border border-cyan-500/20">
               {invData.status}
             </span>

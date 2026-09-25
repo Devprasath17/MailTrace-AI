@@ -21,6 +21,7 @@ interface SummaryResponse {
     status: string;
     threatType: string;
     riskScore: number;
+    isDemo?: boolean;
     createdAt: string;
   }>;
 }
@@ -156,7 +157,14 @@ export const Dashboard: React.FC = () => {
               <tbody className="divide-y divide-slate-800/60">
                 {recentList.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-900/40 transition-colors">
-                    <td className="py-3 px-4 font-mono font-medium text-cyan-400">{item.caseNumber}</td>
+                    <td className="py-3 px-4 font-mono font-medium text-cyan-400 flex items-center gap-1.5">
+                      <span>{item.caseNumber}</span>
+                      {item.isDemo && (
+                        <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-400 border border-amber-500/30">
+                          DEMO
+                        </span>
+                      )}
+                    </td>
                     <td className="py-3 px-4 font-medium text-slate-200 truncate max-w-xs">{item.title}</td>
                     <td className="py-3 px-4 text-slate-300">{item.threatType}</td>
                     <td className="py-3 px-4">

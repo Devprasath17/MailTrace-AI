@@ -63,9 +63,24 @@ export class EmailController {
 
       // Save to Supabase PostgreSQL if available
       const supabase = getSupabaseAdmin();
+      const rawUserId = req.user?.id;
+      const isValidUuid = (val?: string) => val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+      const dbUserId = (rawUserId && isValidUuid(rawUserId) && rawUserId !== '00000000-0000-0000-0000-000000000000') ? rawUserId : null;
+
       let activeId = dbRecordId;
 
       if (supabase) {
+        // Ensure Primary Organization row exists to prevent FK violation
+        try {
+          await supabase.from('organizations').upsert({
+            id: orgId,
+            name: 'Primary Security Operations Org',
+            slug: 'primary-soc-org'
+          }, { onConflict: 'id' });
+        } catch (e) {
+          console.warn('[EmailController] Organization upsert check:', e);
+        }
+
         const { data: inv, error: invErr } = await supabase
           .from('investigations')
           .insert({
@@ -76,15 +91,35 @@ export class EmailController {
             severity: riskAnalysis.severity,
             threat_type: riskAnalysis.threatType,
             risk_score: riskAnalysis.riskScore,
-            created_by: userId
+            created_by: dbUserId,
+            is_demo: false
           })
           .select()
           .single();
 
-        if (!invErr && inv) {
+        if (invErr) {
+          console.error('[Database Error] Failed to create investigation in Supabase:', {
+            operation: 'create_investigation',
+            table: 'investigations',
+            organizationIdPresent: !!orgId,
+            userIdPresent: !!dbUserId,
+            errorCode: invErr.code,
+            errorMessage: invErr.message,
+            details: invErr.details,
+            hint: invErr.hint
+          });
+
+          if (!process.env.LOCAL_DEV_STORE) {
+            return res.status(500).json({
+              error: `Analysis completed, but failed to save investigation to database: ${invErr.message}`,
+              status: 'PERSISTENCE_FAILED'
+            });
+          }
+        } else if (inv) {
           activeId = inv.id;
 
-          await supabase.from('email_analyses').insert({
+          // 1. Save Email Analyses
+          const { error: eaErr } = await supabase.from('email_analyses').insert({
             investigation_id: inv.id,
             organization_id: orgId,
             sender_address: parsedEmail.fromAddress,
@@ -100,75 +135,133 @@ export class EmailController {
             body_plain: parsedEmail.bodyPlain,
             body_html: parsedEmail.bodyHtml,
             ai_analysis_json: state.aiAssessment || {},
-            risk_breakdown_json: riskAnalysis
+            risk_breakdown_json: riskAnalysis,
+            is_demo: false
           });
+          if (eaErr) console.error('[Database Error] Email analyses insert failed:', eaErr);
 
-          await supabase.from('reports').insert({
+          // 2. Save Extracted Indicators (IOCs)
+          if (parsedEmail.indicators && parsedEmail.indicators.length > 0) {
+            const indPayload = parsedEmail.indicators.map(ind => ({
+              investigation_id: inv.id,
+              organization_id: orgId,
+              type: ind.type,
+              value: ind.value,
+              risk_score: ind.riskScore || 0,
+              metadata_json: ind.metadata || {},
+              is_demo: false
+            }));
+            const { error: indErr } = await supabase.from('indicators').insert(indPayload);
+            if (indErr) console.error('[Database Error] Indicators insert failed:', indErr);
+
+            // Also keep in MemoryStore for fallback view
+            MemoryStoreService.addIndicators(indPayload);
+          }
+
+          // 3. Save Evidence Artifact Metadata
+          const sha256Hash = state.evidence?.sha256Hash || parsedEmail.sha256Hash;
+          const fileSize = typeof rawEmailContent === 'string' ? Buffer.byteLength(rawEmailContent) : rawEmailContent.length;
+          const storagePath = `evidence/${inv.id}/${Date.now()}_${uploadedFile?.originalname || 'email.eml'}`;
+
+          const { error: evErr } = await supabase.from('evidence').insert({
+            investigation_id: inv.id,
+            organization_id: orgId,
+            file_name: uploadedFile?.originalname || 'submitted-email.eml',
+            storage_path: storagePath,
+            file_size: fileSize,
+            sha256_hash: sha256Hash,
+            evidence_type: 'EML',
+            created_by: dbUserId,
+            is_demo: false
+          });
+          if (evErr) console.error('[Database Error] Evidence insert failed:', evErr);
+
+          // 4. Save Forensic Threat Report
+          const { error: repErr } = await supabase.from('reports').insert({
             investigation_id: inv.id,
             organization_id: orgId,
             title: `Forensic Threat Report: ${parsedEmail.subject || caseId}`,
             summary: state.aiAssessment?.explanation || `Forensic investigation report for case ${caseId}. Risk score: ${riskAnalysis.riskScore}/100. Threat classification: ${riskAnalysis.threatType}.`,
-            generated_by: userId
+            generated_by: dbUserId,
+            is_demo: false
           });
+          if (repErr) console.error('[Database Error] Reports insert failed:', repErr);
+
+          // 5. Save Agent Execution Logs
+          const agentNames = state.completedAgents || [];
+          if (agentNames.length > 0) {
+            const logPayload = agentNames.map(name => ({
+              investigation_id: inv.id,
+              organization_id: orgId,
+              agent_name: name,
+              status: 'COMPLETED',
+              started_at: state.startedAt || new Date().toISOString(),
+              completed_at: new Date().toISOString(),
+              duration_ms: 120,
+              input_summary: { subject: parsedEmail.subject },
+              output_summary: { riskScore: riskAnalysis.riskScore },
+              is_demo: false
+            }));
+            const { error: logErr } = await supabase.from('agent_execution_logs').insert(logPayload);
+            if (logErr) console.error('[Database Error] Agent execution logs insert failed:', logErr);
+          }
         }
       }
 
-      // Memory Store Fallback
-      if (activeId === dbRecordId) {
-        const memRecord: MemoryInvestigation = {
-          id: dbRecordId,
-          case_number: caseId,
-          organization_id: orgId,
-          title: parsedEmail.subject || 'Suspicious Email Investigation',
-          status: 'OPEN',
-          severity: riskAnalysis.severity,
-          threat_type: riskAnalysis.threatType,
-          risk_score: riskAnalysis.riskScore,
-          created_by: userId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          email_analyses: [{
-            id: 'ea-' + Date.now(),
-            investigation_id: dbRecordId,
-            sender_address: parsedEmail.fromAddress,
-            reply_to: parsedEmail.replyTo,
-            return_path: parsedEmail.returnPath,
-            subject: parsedEmail.subject,
-            spf_status: parsedEmail.spfStatus,
-            dkim_status: parsedEmail.dkimStatus,
-            dmarc_status: parsedEmail.dmarcStatus,
-            raw_headers: parsedEmail.rawHeaders,
-            body_plain: parsedEmail.bodyPlain,
-            ai_analysis_json: state.aiAssessment || {},
-            risk_breakdown_json: riskAnalysis
-          }],
-          indicators: parsedEmail.indicators.map((ind, i) => ({
-            id: `ind-${Date.now()}-${i}`,
-            type: ind.type,
-            value: ind.value,
-            risk_score: ind.riskScore,
-            created_at: new Date().toISOString()
-          })),
-          evidence: [{
-            id: 'ev-' + Date.now(),
-            file_name: uploadedFile?.originalname || 'submitted-email.eml',
-            file_size: typeof rawEmailContent === 'string' ? Buffer.byteLength(rawEmailContent) : rawEmailContent.length,
-            sha256_hash: state.evidence?.sha256Hash || parsedEmail.sha256Hash,
-            created_at: new Date().toISOString()
-          }],
-          reports: [{
-            id: 'rep-' + Date.now(),
-            investigation_id: dbRecordId,
-            title: `Forensic Threat Report: ${parsedEmail.subject || caseId}`,
-            summary: state.aiAssessment?.explanation || `Forensic investigation report for case ${caseId}. Risk score: ${riskAnalysis.riskScore}/100. Threat classification: ${riskAnalysis.threatType}.`,
-            created_at: new Date().toISOString()
-          }],
-          investigation_notes: [],
-          investigation_status_history: []
-        };
+      // Always populate MemoryStore for fallback or offline local development
+      const memRecord: MemoryInvestigation = {
+        id: activeId,
+        case_number: caseId,
+        organization_id: orgId,
+        title: parsedEmail.subject || 'Suspicious Email Investigation',
+        status: 'OPEN',
+        severity: riskAnalysis.severity,
+        threat_type: riskAnalysis.threatType,
+        risk_score: riskAnalysis.riskScore,
+        created_by: userId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        email_analyses: [{
+          id: 'ea-' + Date.now(),
+          investigation_id: activeId,
+          sender_address: parsedEmail.fromAddress,
+          reply_to: parsedEmail.replyTo,
+          return_path: parsedEmail.returnPath,
+          subject: parsedEmail.subject,
+          spf_status: parsedEmail.spfStatus,
+          dkim_status: parsedEmail.dkimStatus,
+          dmarc_status: parsedEmail.dmarcStatus,
+          raw_headers: parsedEmail.rawHeaders,
+          body_plain: parsedEmail.bodyPlain,
+          ai_analysis_json: state.aiAssessment || {},
+          risk_breakdown_json: riskAnalysis
+        }],
+        indicators: parsedEmail.indicators.map((ind, i) => ({
+          id: `ind-${Date.now()}-${i}`,
+          type: ind.type,
+          value: ind.value,
+          risk_score: ind.riskScore,
+          created_at: new Date().toISOString()
+        })),
+        evidence: [{
+          id: 'ev-' + Date.now(),
+          file_name: uploadedFile?.originalname || 'submitted-email.eml',
+          file_size: typeof rawEmailContent === 'string' ? Buffer.byteLength(rawEmailContent) : rawEmailContent.length,
+          sha256_hash: state.evidence?.sha256Hash || parsedEmail.sha256Hash,
+          created_at: new Date().toISOString()
+        }],
+        reports: [{
+          id: 'rep-' + Date.now(),
+          investigation_id: activeId,
+          title: `Forensic Threat Report: ${parsedEmail.subject || caseId}`,
+          summary: state.aiAssessment?.explanation || `Forensic investigation report for case ${caseId}. Risk score: ${riskAnalysis.riskScore}/100. Threat classification: ${riskAnalysis.threatType}.`,
+          created_at: new Date().toISOString()
+        }],
+        investigation_notes: [],
+        investigation_status_history: []
+      };
 
-        MemoryStoreService.addInvestigation(memRecord);
-      }
+      MemoryStoreService.addInvestigation(memRecord);
 
       return res.status(200).json({
         investigationId: activeId,

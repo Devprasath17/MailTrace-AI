@@ -78,11 +78,9 @@ Respond ONLY with a valid JSON object matching this schema without any markdown 
 `;
 
     const modelCandidates = [
-      'gemini-1.5-flash',
-      'gemini-1.5-flash-latest',
-      'gemini-1.5-pro',
-      'gemini-2.0-flash-exp',
-      'gemini-pro'
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-flash'
     ];
 
     let lastError: any = null;

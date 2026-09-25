@@ -9,9 +9,10 @@ export class DashboardController {
       const supabase = getSupabaseAdmin();
       const orgId = req.user?.organizationId || '00000000-0000-0000-0000-000000000001';
 
+      const isDevMode = process.env.LOCAL_DEV_STORE === 'true' || !supabase;
       let list: any[] = [];
 
-      if (!supabase) {
+      if (isDevMode) {
         list = MemoryStoreService.getInvestigations(orgId);
       } else {
         const { data } = await supabase
@@ -36,7 +37,7 @@ export class DashboardController {
         threatBreakdown[type] = (threatBreakdown[type] || 0) + 1;
       });
 
-      const recentActivity = list.slice(0, 5).map(i => ({
+      const recentActivity = list.slice(0, 10).map(i => ({
         id: i.id,
         caseNumber: i.case_number,
         title: i.title,
@@ -44,6 +45,7 @@ export class DashboardController {
         status: i.status,
         threatType: i.threat_type,
         riskScore: i.risk_score,
+        isDemo: !!i.is_demo,
         createdAt: i.created_at
       }));
 
